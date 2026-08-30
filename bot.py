@@ -32,6 +32,25 @@ DATA_FILE        = "vip_strike_v15_data.json"
 VERSION          = "V15-PREMIUM"
 
 # ============================================================
+# TELEGRAM SIGNAL SENDER FUNCTION
+# ============================================================
+def send_telegram_signal(message):
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        payload = {
+            "chat_id": TELEGRAM_CHAT_ID,
+            "text": message,
+            "parse_mode": "Markdown"
+        }
+        response = requests.post(url, json=payload, timeout=10)
+        if response.status_code == 200:
+            print("✉️ [TELEGRAM] Signal sent successfully.")
+        else:
+            print(f"⚠️ [TELEGRAM] Failed to send. Status: {response.status_code}")
+    except Exception as e:
+        print(f"❌ [TELEGRAM] Error sending message: {e}")
+
+# ============================================================
 # OPTIONAL IMPORTS (Machine Learning)
 # ============================================================
 try:
@@ -137,14 +156,8 @@ class HistoryManager:
 # LIFELONG META-LEARNER (The AI Brain that Learns & Updates itself)
 # ============================================================
 class UltimateMetaBrain:
-    """
-    Reinforcement Learning Meta-Learner. 
-    It tracks which model (LSTM, Pattern, XGBoost, etc.) is performing best in real-time.
-    It saves its memory to disk, so it gets smarter every day.
-    """
     def __init__(self):
         self.brain_file = "ultimate_meta_brain.json"
-        # Initial weights for the models
         self.weights = {
             'TF-LSTM': 3.0, 'SK-ENSEMBLE': 2.5, 'XGBOOST': 2.5,
             'PATTERN': 2.0, 'MARKOV': 1.8, 'MACD': 1.6, 'RSI': 1.5,
@@ -169,16 +182,13 @@ class UltimateMetaBrain:
             json.dump(self.weights, f)
 
     def learn(self, predictions_list, actual_result):
-        """ Update AI weights based on real result """
         if not predictions_list: return
         with self._lock:
             for pred, conf, name in predictions_list:
                 if not name: continue
-                # Extract base model name (e.g., 'TF-LSTM' from '🧠 TF-LSTM (BIG 70%)')
-                base_name = name.split()[1].upper() if len(name.split()) > 1 else 'DEFAULT'
+                base_name = name.split().upper() if len(name.split()) > 1 else 'DEFAULT'
                 key = next((k for k in self.weights.keys() if k in base_name), 'DEFAULT')
                 
-                # Reinforcement Learning: Reward or Punish
                 if pred == actual_result:
                     self.weights[key] = min(5.0, self.weights[key] + self.learning_rate)
                 else:
@@ -192,7 +202,7 @@ class UltimateMetaBrain:
         
         for pred, conf, name in predictions:
             if not pred or conf == 0: continue
-            base_name = name.split()[1].upper() if name and len(name.split()) > 1 else 'DEFAULT'
+            base_name = name.split().upper() if name and len(name.split()) > 1 else 'DEFAULT'
             key = next((k for k in self.weights.keys() if k in base_name), 'DEFAULT')
             
             mw = self.weights[key]
@@ -209,11 +219,10 @@ class UltimateMetaBrain:
         big_r = safe_divide(big_score, total_score, 0.5)
         final_pred = 'BIG' if big_r >= 0.5 else 'SMALL'
         
-        best = max(valid, key=lambda x: x[1])
-        # Dynamic Confidence Generation
-        final_conf = clamp(best[1] + int(abs(big_r - 0.5) * 20), 60, 99)
+        best = max(valid, key=lambda x: x)
+        final_conf = clamp(best + int(abs(big_r - 0.5) * 20), 60, 99)
         
-        return final_pred, final_conf, best[2], big_r
+        return final_pred, final_conf, best, big_r
 
 # ============================================================
 # XGBOOST & LSTM AI CLASSES
@@ -241,10 +250,10 @@ class XGBoostModel:
         if not XGB_AVAILABLE or not self.trained or len(hist) < 5: return None, 0, None
         binary = list(reversed(to_binary_list(hist[:5])))
         try:
-            prob = self.model.predict_proba(np.array([binary]))[0][1]
+            prob = self.model.predict_proba(np.array([binary]))
             pred = 'BIG' if prob >= 0.5 else 'SMALL'
             conf = int(55 + abs(prob - 0.5) * 88)
-            return pred, min(99, conf), f"🌲 XGBOOST ({pred[0]} {prob*100:.0f}%)"
+            return pred, min(99, conf), f"🌲 XGBOOST ({pred} {prob*100:.0f}%)"
         except: return None, 0, None
 
 class RealLSTMPredictor:
@@ -283,14 +292,11 @@ class RealLSTMPredictor:
         seq = list(reversed(hist[:self.SEQUENCE_LEN]))
         try:
             X = np.array([[[1 if v=='BIG' else 0] for v in seq]], dtype=np.float32)
-            prob = float(self.model.predict(X, verbose=0)[0][0])
+            prob = float(self.model.predict(X, verbose=0))
             pred = 'BIG' if prob >= 0.5 else 'SMALL'
             conf = int(55 + abs(prob - 0.5) * 88)
-            return pred, min(99, conf), f"🧠 TF-LSTM ({pred[0]} {prob*100:.1f}%)"
+            return pred, min(99, conf), f"🧠 TF-LSTM ({pred} {prob*100:.1f}%)"
         except: return None, 0, None
-
-
-# --- (Skipping the long statistical classes to save space, assuming they are basic components like Markov, Patterns. I will put a compressed version of them so the code runs perfectly without relying on external files) ---
 
 class BasicStatsPredictors:
     def markov_predict(self, hist):
@@ -301,9 +307,9 @@ class BasicStatsPredictors:
         
     def pattern_predict(self, hist):
         if len(hist) < 4: return None, 0, None
-        if hist[0] == hist[1] == hist[2]:
-            opp = 'SMALL' if hist[0] == 'BIG' else 'BIG'
-            return opp, 85, f"🐉 PATTERN-DRAGON ({hist[0]}x3)"
+        if hist == hist == hist:
+            opp = 'SMALL' if hist == 'BIG' else 'BIG'
+            return opp, 85, f"🐉 PATTERN-DRAGON ({hist}x3)"
         return None, 0, None
 
 class MarketStateAnalyzer:
@@ -352,7 +358,6 @@ class StrikeV15Ultimate:
         self.tracker = WinLossTracker()
         self.market_analyzer = MarketStateAnalyzer()
         
-        # New Brain and ML Models
         self.brain = UltimateMetaBrain()
         self.tf_lstm = RealLSTMPredictor()
         self.xgb = XGBoostModel()
@@ -375,7 +380,6 @@ class StrikeV15Ultimate:
         self._train_count += 1
         hist_nf = self.history.get_newest_first()
         
-        # Background Retraining every 30 rounds
         if self._train_count % 30 == 0:
             threading.Thread(target=self.tf_lstm.train, args=(hist_nf,), daemon=True).start()
             threading.Thread(target=self.xgb.train, args=(hist_nf,), daemon=True).start()
@@ -398,29 +402,29 @@ class StrikeV15Ultimate:
         for name, fn in runners:
             try:
                 r = fn(hist_nf)
-                if r and r[0] and r[1] > 0:
-                    all_preds.append((r[0], r[1], r[2]))
+                if r and r and r > 0:
+                    all_preds.append((r, r, r))
             except: pass
 
-        # Save this to learn later
         self.last_all_preds = all_preds
-        
-        # AI Brain Votes based on Lifelong Learning
         final_pred, final_conf, final_name, big_ratio = self.brain.vote(all_preds, self.last_market_state)
         return final_pred, final_conf, final_name
 
     def record_result(self, predicted, actual, period):
-        # Feedback loop to make AI smarter
         self.brain.learn(self.last_all_preds, actual)
 
 
 # ============================================================
-# WEB SERVER SETUP (FLASK + CORS)
+# WEB SERVER SETUP (FLASK + CORS) & HEALTH CHECK
 # ============================================================
 flask_app = Flask(__name__)
-CORS(flask_app) # THIS ALLOWS CLOUD HOSTING TO WORK WITH YOUR HTML
+CORS(flask_app)
 flask_app.config['SECRET_KEY'] = 'premium-secret'
 socketio  = SocketIO(flask_app, cors_allowed_origins='*', async_mode='threading')
+
+@flask_app.route('/')
+def home():
+    return "Premium AI Engine is Running Successfully!", 200
 
 _app_instance = None
 _realtime_state = {}
@@ -459,14 +463,13 @@ class PremiumApp:
             if resp.status_code == 200:
                 lst = resp.json().get('data', {}).get('list', [])
                 if lst:
-                    return str(lst[0].get('issueNumber')), str(lst[0].get('number'))
+                    return str(lst.get('issueNumber')), str(lst.get('number'))
         except: pass
         return None, None
 
     def run(self):
         print("🚀 PREMIUM AI ENGINE STARTED. LIFELONG LEARNING ACTIVE.")
         
-        # Load Initial History
         for _ in range(3):
             try:
                 resp = requests.get(API_URL, params={'t': int(time.time()*1000)}, timeout=10)
@@ -490,7 +493,7 @@ class PremiumApp:
                 if period and number:
                     result, _ = self.ai.normalize_result(number)
                     try:
-                        next_period = str(int(period) + 1) if '_' not in period else f"{period.split('_')[0]}_{int(period.split('_')[1])+1:04d}"
+                        next_period = str(int(period) + 1) if '_' not in period else f"{period.split('_')[0]}_{int(period.split('_'))+1:04d}"
                     except: next_period = period + "_next"
 
                     if self.ai.last_issue_id and period != self.ai.last_issue_id:
@@ -514,10 +517,18 @@ class PremiumApp:
                     
                     if self.ai.last_issue_id != period:
                         print(f"📡 AI PREDICTING [{next_period}]: {pred} ({conf}%)")
+                        
+                        # --- স্বয়ংক্রিয় টেলিগ্রাম সিগন্যাল ট্রিগার ---
+                        telegram_msg = (
+                            f"🔔 *ULTIMATE VIP STRIKE V15*\n\n"
+                            f"📊 *Period:* `{next_period}`\n"
+                            f"🔮 *Prediction:* `{pred}`\n"
+                            f"🔥 *Confidence:* `{conf}%`\n"
+                            f"🎯 *Engine:* `{pattern}`"
+                        )
+                        send_telegram_signal(telegram_msg)
                     
                     self.ai.last_issue_id = period
-                    
-                    # Push to Web HTML Dashboard
                     update_web_state(self.ai, pred, conf, pattern, period, number, result, next_period, outcome=None)
             
             time.sleep(1)
@@ -530,6 +541,4 @@ def start_bot():
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     threading.Thread(target=start_bot, daemon=True).start()
-    
-    # Run the server on Port 5000 (0.0.0.0 enables cloud access)
     socketio.run(flask_app, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)
