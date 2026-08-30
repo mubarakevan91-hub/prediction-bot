@@ -10,4 +10,4 @@ tensorflow
 xgboost
 joblib
 gunicorn
-eventlet
+gevent
