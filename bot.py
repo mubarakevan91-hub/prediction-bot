@@ -1,5 +1,5 @@
 # ==============================================================================
-# 🚀 QUANT-LEVEL VIP STRIKE AI (MARKET-AWARE V20 PRO - INSTANT SIGNAL FIX)
+# 🚀 QUANT-LEVEL VIP STRIKE AI (MARKET-AWARE V20 PRO + LOSS STEP TRACKER)
 # ==============================================================================
 
 import os
@@ -14,6 +14,8 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import io
+import math
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # AI Libraries
@@ -33,13 +35,8 @@ TELEGRAM_CHAT_ID = "8395823375"
 API_URL = "https://draw.ar-lottery01.com/WinGo/WinGo_30S/GetHistoryIssuePage.json"
 DB_FILE = "quant_ai_memory.db"
 
-HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    'Accept': 'application/json, text/plain, */*'
-}
-
 # ==============================================================================
-# 🧠 INFINITE LIFELONG MEMORY (SQLite)
+# 🧠 INFINITE LIFELONG MEMORY (SQLite With Loss-Step Engine)
 # ==============================================================================
 
 class SQLiteMemory:
@@ -106,7 +103,7 @@ class SQLiteMemory:
             curr_loss = 0
             curr_win = 0
             
-            step_distribution = {}
+            step_distribution = {}  # {Step 1: X wins, Step 2: Y wins, ...}
             win_steps = []
 
             for is_win, step in rows:
@@ -139,23 +136,25 @@ class PatternEngine:
 
         last = history[-1]
         
-        # 1. DRAGON TREND
+        # 1. DRAGON / STREAK DETECTION
         streak = 1
         for i in range(2, len(history)):
-            if history[-i] == last: streak += 1
-            else: break
+            if history[-i] == last:
+                streak += 1
+            else:
+                break
             
         if streak >= 3:
             conf = min(99, 70 + (streak * 5))
             return last, conf, f"🔥 Dragon Trend Active ({streak}x {last})"
             
-        # 2. ALTERNATING (B-S-B-S)
+        # 2. JUMP / ALTERNATING DETECTION (B-S-B-S)
         if len(history) >= 4:
             if history[-1] != history[-2] and history[-2] != history[-3] and history[-3] != history[-4]:
                 pred = 'BIG' if last == 'SMALL' else 'SMALL'
                 return pred, 85, "⚡ Alternating/Jump Pattern"
                 
-        # 3. 2x2 MIRROR (B-B-S-S)
+        # 3. TWO-BY-TWO DETECTION (B-B-S-S)
         if len(history) >= 4:
             if history[-1] == history[-2] and history[-3] == history[-4] and history[-1] != history[-3]:
                 pred = 'BIG' if last == 'SMALL' else 'SMALL'
@@ -164,20 +163,20 @@ class PatternEngine:
         return None, 0, "No Clear Pattern"
 
 # ==============================================================================
-# 🧬 ADVANCED AI ENGINE
+# 🧬 ADVANCED AI (LSTM + XGBoost)
 # ==============================================================================
 
 class AdvancedAI:
     def __init__(self):
-        self.seq_len = 15
+        self.seq_len = 20
         self.tf_model = self._build_model()
-        self.xgb_model = xgb.XGBClassifier(n_estimators=50, learning_rate=0.08, max_depth=3)
+        self.xgb_model = xgb.XGBClassifier(n_estimators=100, learning_rate=0.05, max_depth=4)
         self.is_tf_trained = False
         self.is_xgb_trained = False
 
     def _build_model(self):
         inputs = Input(shape=(self.seq_len, 1))
-        x = LSTM(24, return_sequences=True)(inputs)
+        x = LSTM(32, return_sequences=True)(inputs)
         x = GlobalAveragePooling1D()(x)
         outputs = Dense(1, activation='sigmoid')(x)
         model = Model(inputs=inputs, outputs=outputs)
@@ -191,7 +190,7 @@ class AdvancedAI:
         return df.dropna()
 
     def train_models(self, history):
-        if len(history) < 30: return
+        if len(history) < 40: return
         binary = [1 if h == 'BIG' else 0 for h in history]
         
         X_tf, y_tf = [], []
@@ -199,7 +198,7 @@ class AdvancedAI:
             X_tf.append([[v] for v in binary[i:i+self.seq_len]])
             y_tf.append(binary[i+self.seq_len])
         if X_tf:
-            self.tf_model.fit(np.array(X_tf), np.array(y_tf), epochs=3, verbose=0)
+            self.tf_model.fit(np.array(X_tf), np.array(y_tf), epochs=5, verbose=0)
             self.is_tf_trained = True
 
         df = self.feature_engineering(history)
@@ -208,7 +207,6 @@ class AdvancedAI:
             y_xgb = df['res'].values
             self.xgb_model.fit(X_xgb, y_xgb)
             self.is_xgb_trained = True
-        print("🧠 [AI] Fast Training Complete.")
 
     def predict(self, history):
         tf_pred, xgb_pred = None, None
@@ -219,7 +217,7 @@ class AdvancedAI:
             if prob > 0.55: tf_pred = 'BIG'
             elif prob < 0.45: tf_pred = 'SMALL'
 
-        if self.is_xgb_trained and len(history) >= 15:
+        if self.is_xgb_trained and len(history) >= 20:
             df = self.feature_engineering(history)
             if not df.empty:
                 try:
@@ -228,39 +226,34 @@ class AdvancedAI:
                     prob = self.xgb_model.predict_proba(X_test)[0][idx]
                     if prob > 0.55: xgb_pred = 'BIG'
                     elif prob < 0.45: xgb_pred = 'SMALL'
-                except: pass
+                except:
+                    pass
 
         return tf_pred, xgb_pred
 
 # ==============================================================================
-# TELEGRAM PRO INTERFACE
+# PREMIUM TELEGRAM INTERFACE
 # ==============================================================================
 
 class TelegramProBot:
-    def __init__(self, token, default_chat_id):
+    def __init__(self, token, chat_id):
         self.token = token
-        self.default_chat_id = default_chat_id
+        self.chat_id = chat_id
         self.api = f"https://api.telegram.org/bot{token}"
         self.offset = 0
 
-    def send_message(self, text, chat_id=None, reply_markup=None):
-        target_id = chat_id if chat_id else self.default_chat_id
-        payload = {'chat_id': target_id, 'text': text, 'parse_mode': 'HTML', 'disable_web_page_preview': True}
-        if reply_markup: payload['reply_markup'] = json.dumps(reply_markup)
-        try:
-            requests.post(f"{self.api}/sendMessage", json=payload, timeout=10)
-        except Exception as e:
-            print(f"Telegram Send Error: {e}")
+    def send_message(self, text, reply_markup=None):
+        payload = {'chat_id': self.chat_id, 'text': text, 'parse_mode': 'HTML', 'disable_web_page_preview': True}
+        if reply_markup:
+            payload['reply_markup'] = json.dumps(reply_markup)
+        requests.post(f"{self.api}/sendMessage", json=payload)
 
-    def send_photo(self, photo_bytes, caption="", chat_id=None, reply_markup=None):
-        target_id = chat_id if chat_id else self.default_chat_id
+    def send_photo(self, photo_bytes, caption="", reply_markup=None):
         files = {'photo': ('chart.png', photo_bytes, 'image/png')}
-        data = {'chat_id': target_id, 'caption': caption, 'parse_mode': 'HTML'}
-        if reply_markup: data['reply_markup'] = json.dumps(reply_markup)
-        try:
-            requests.post(f"{self.api}/sendPhoto", data=data, files=files, timeout=10)
-        except Exception as e:
-            print(f"Photo Send Error: {e}")
+        data = {'chat_id': self.chat_id, 'caption': caption, 'parse_mode': 'HTML'}
+        if reply_markup:
+            data['reply_markup'] = json.dumps(reply_markup)
+        requests.post(f"{self.api}/sendPhoto", data=data, files=files)
 
     def get_inline_keyboard(self):
         return {
@@ -288,38 +281,25 @@ class TelegramProBot:
 
     def process_updates(self, controller):
         try:
-            res = requests.get(f"{self.api}/getUpdates", params={'offset': self.offset + 1, 'timeout': 1}, timeout=5).json()
+            res = requests.get(f"{self.api}/getUpdates", params={'offset': self.offset+1, 'timeout': 1}).json()
             for update in res.get('result', []):
                 self.offset = update['update_id']
-                if 'message' in update:
-                    chat_id = update['message']['chat']['id']
-                    text = update['message'].get('text', '')
-                    if text.startswith('/start'):
-                        welcome = (
-                            "👋 <b>Welcome to QUANT AI STRIKE BOT!</b>\n\n"
-                            "Signals will be broadcasted automatically on every 30s period.\n"
-                            "Use the buttons below to check live stats & momentum chart."
-                        )
-                        self.send_message(welcome, chat_id=chat_id, reply_markup=self.get_inline_keyboard())
-
-                elif 'callback_query' in update:
-                    chat_id = update['callback_query']['message']['chat']['id']
+                if 'callback_query' in update:
                     data = update['callback_query']['data']
                     if data == "cmd_chart":
                         hist = controller.db.get_recent_history(50)
-                        if len(hist) > 5:
+                        if len(hist) > 10:
                             img = self.generate_chart(hist)
-                            self.send_photo(img, "📈 <b>Live Market Trend Chart</b>", chat_id=chat_id, reply_markup=self.get_inline_keyboard())
-                        else:
-                            self.send_message("⏳ Waiting for data...", chat_id=chat_id)
+                            self.send_photo(img, "📈 <b>Live Market Trend</b>", self.get_inline_keyboard())
                     elif data == "cmd_stats":
                         tot, w, l, ws, ls, max_l, max_w, avg_step, steps = controller.db.get_detailed_stats()
                         rate = (w/tot*100) if tot > 0 else 0
+                        
                         step_breakdown = "\n".join([f"  • <b>Step {k} Wins:</b> {v} times" for k, v in sorted(steps.items())])
-                        if not step_breakdown: step_breakdown = "  • Waiting for history..."
+                        if not step_breakdown: step_breakdown = "  • No data yet."
 
                         msg = (
-                            f"🏆 <b>AI ACCURACY & LOSS AUDIT</b>\n"
+                            f"🏆 <b>AI PERFORMANCE & LOSS AUDIT</b>\n"
                             f"━━━━━━━━━━━━━━━━━━\n"
                             f"🎯 <b>Total Rounds:</b> {tot}\n"
                             f"✅ <b>Total Wins:</b> {w} ({rate:.1f}%)\n"
@@ -332,13 +312,16 @@ class TelegramProBot:
                             f"━━━━━━━━━━━━━━━━━━\n"
                             f"📊 <b>Step-by-Step Win Breakdown:</b>\n"
                             f"{step_breakdown}\n"
+                            f"━━━━━━━━━━━━━━━━━━\n"
+                            f"💡 <i>Low Max Loss Step = Strong AI Learning</i>"
                         )
-                        self.send_message(msg, chat_id=chat_id, reply_markup=self.get_inline_keyboard())
+                        self.send_message(msg, self.get_inline_keyboard())
                     elif data == "cmd_train":
-                        self.send_message("⚙️ <i>Retraining AI Engine...</i>", chat_id=chat_id)
+                        self.send_message("⚙️ <i>Retraining AI Engine on recent market history...</i>")
                         threading.Thread(target=controller.ai.train_models, args=(controller.db.get_recent_history(300),)).start()
-                        self.send_message("✅ <b>AI Re-calibrated!</b>", chat_id=chat_id, reply_markup=self.get_inline_keyboard())
-        except: pass
+                        self.send_message("✅ <b>AI Re-calibrated & Synced!</b>", self.get_inline_keyboard())
+        except:
+            pass
 
 # ==============================================================================
 # MAIN ENGINE CONTROLLER
@@ -352,32 +335,25 @@ class UltimateController:
         self.bot = TelegramProBot(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID)
         self.last_period = None
 
-    def fetch_api_data(self):
-        try:
-            res = requests.get(API_URL, headers=HEADERS, params={'t': int(time.time()*1000)}, timeout=8)
-            if res.status_code == 200:
-                js = res.json()
-                data_list = js.get('data', {}).get('list', [])
-                if not data_list and isinstance(js.get('data'), list):
-                    data_list = js.get('data')
-                return data_list
-        except Exception as e:
-            print(f"API Fetch Error: {e}")
-        return []
-
     def get_final_prediction(self):
         hist = self.db.get_recent_history(100)
         if not hist: return "BIG", 50, "Waiting for Data"
 
+        # 1. Market Pattern Priority
         pat_pred, pat_conf, pat_name = self.patterns.analyze(hist)
-        if pat_pred: return pat_pred, pat_conf, pat_name
+        if pat_pred:
+            return pat_pred, pat_conf, pat_name
 
+        # 2. Hybrid AI Consensus
         tf_pred, xgb_pred = self.ai.predict(hist)
         if tf_pred and xgb_pred and tf_pred == xgb_pred:
             return tf_pred, 78, "🤖 Consensus (LSTM + XGB)"
-        elif tf_pred: return tf_pred, 68, "🧠 Deep LSTM Model"
-        elif xgb_pred: return xgb_pred, 65, "🌲 XGBoost Algorithm"
+        elif tf_pred:
+            return tf_pred, 68, "🧠 Deep LSTM Model"
+        elif xgb_pred:
+            return xgb_pred, 65, "🌲 XGBoost Decision Tree"
         
+        # 3. Mean Reversion fallback
         fallback_pred = 'SMALL' if hist[-1] == 'BIG' else 'BIG'
         return fallback_pred, 55, "⚖️ Market Mean Reversion"
 
@@ -385,97 +361,106 @@ class UltimateController:
         filled = int(conf / 10)
         return "🟩" * filled + "⬜" * (10 - filled)
 
-    def send_prediction_signal(self, current_period, result=None, num=None, is_win=None, played_step=None):
-        outcome_msg = ""
-        if is_win is not None:
-            if is_win == 1:
-                outcome_icon = f"✅ <b>WIN (Step {played_step} Recovery)</b>" if played_step > 1 else "✅ <b>DIRECT WIN (Step 1)</b>"
-            else:
-                outcome_icon = f"❌ <b>LOSS (Failed at Step {played_step})</b>"
-                
-            outcome_msg = (
-                f"📊 <b>Round:</b> <code>{current_period}</code>\n"
-                f"🎯 <b>Result:</b> {'🔴 BIG' if result=='BIG' else '🔵 SMALL'} [{num}]\n"
-                f"⚖️ <b>Status:</b> {outcome_icon}\n"
-                f"━━━━━━━━━━━━━━━━━━\n"
-            )
-
-        next_per = str(int(current_period) + 1) if '_' not in current_period else f"{current_period.split('_')[0]}_{int(current_period.split('_')[1])+1:04d}"
-        tot, w, l, ws, curr_loss_streak, max_loss, max_win, avg_step, _ = self.db.get_detailed_stats()
-        next_step = curr_loss_streak + 1
-        
-        pred, conf, strategy = self.get_final_prediction()
-        self.db.save_prediction(next_per, pred, step=next_step)
-        
-        rate = (w/tot*100) if tot > 0 else 0
-        emoji = "🔴 BIG" if pred == 'BIG' else "🔵 SMALL"
-        prog_bar = self.get_progress_bar(conf)
-        
-        step_display = f"🟢 Step 1 (Normal)" if next_step == 1 else (f"🟡 Step 2 (Recovery)" if next_step == 2 else f"🔴 Step {next_step} (High Alert)")
-
-        msg = (
-            f"⚡ <b>VIP AI SIGNAL</b> ⚡\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"{outcome_msg}"
-            f"🔮 <b>Target Period:</b> <code>{next_per}</code>\n"
-            f"🧠 <b>Prediction:</b> <b>{emoji}</b>\n"
-            f"🪜 <b>Level:</b> <b>{step_display}</b>\n"
-            f"🚥 [{prog_bar}] {conf}%\n"
-            f"⚙️ <b>Strategy:</b> {strategy}\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"🏆 <b>Win Rate:</b> {rate:.1f}% | 💀 <b>Max Loss Step:</b> {max_loss}\n"
-        )
-        self.bot.send_message(msg, reply_markup=self.bot.get_inline_keyboard())
-        print(f"[{next_per}] Signal Sent: {pred} | Step: {next_step}")
-
     def loop(self):
-        self.bot.send_message("🚀 <b>QUANT AI V20 ONLINE</b>\nLoss-Step Optimization Engine Activated.", reply_markup=self.bot.get_inline_keyboard())
+        self.bot.send_message("🚀 <b>QUANT AI V20 ONLINE</b>\nLoss-Step Optimization Engine Activated.", self.bot.get_inline_keyboard())
         print("🚀 QUANT AI ENGINE INITIALIZED...")
         
-        # Initial Boot History Sync
-        boot_data = self.fetch_api_data()
-        if boot_data:
-            for d in reversed(boot_data):
-                issue = str(d.get('issueNumber') or d.get('issue') or d.get('period'))
-                num = int(d.get('number') or d.get('openNum') or d.get('code') or 0)
-                self.db.add_result(issue, 'BIG' if num >= 5 else 'SMALL', num)
-            
-            threading.Thread(target=self.ai.train_models, args=(self.db.get_recent_history(200),)).start()
-            
-            # Send first instant prediction
-            latest = boot_data[0]
-            self.last_period = str(latest.get('issueNumber') or latest.get('issue') or latest.get('period'))
-            self.send_prediction_signal(self.last_period)
+        # Initial Boot Training
+        for _ in range(3):
+            try:
+                data = requests.get(API_URL, params={'t': int(time.time()*1000)}).json()['data']['list']
+                for d in reversed(data):
+                    num = int(d['number'])
+                    self.db.add_result(str(d['issueNumber']), 'BIG' if num>=5 else 'SMALL', num)
+                self.ai.train_models(self.db.get_recent_history(200))
+                print("✅ AI Trained successfully on past data.")
+                break
+            except:
+                time.sleep(2)
 
-        # Main Real-Time Polling Loop
+        # Main Real-Time Loop
         while True:
             try:
                 self.bot.process_updates(self)
-                data_list = self.fetch_api_data()
                 
-                if data_list:
-                    data = data_list[0]
-                    current_period = str(data.get('issueNumber') or data.get('issue') or data.get('period'))
+                req = requests.get(API_URL, params={'t': int(time.time()*1000)}, timeout=10)
+                if req.status_code == 200:
+                    data = req.json()['data']['list'][0]
+                    current_period = str(data['issueNumber'])
                     
                     if current_period != self.last_period:
-                        num = int(data.get('number') or data.get('openNum') or data.get('code') or 0)
+                        num = int(data['number'])
                         result = 'BIG' if num >= 5 else 'SMALL'
                         self.db.add_result(current_period, result, num)
                         
                         is_win, past_pred, played_step = self.db.update_prediction_result(current_period, result)
                         
-                        # Send New Prediction for Next Round
-                        self.send_prediction_signal(current_period, result, num, is_win, played_step)
+                        outcome_msg = ""
+                        if is_win is not None:
+                            if is_win == 1:
+                                outcome_icon = f"✅ <b>WIN (Step {played_step} Recovery)</b>" if played_step > 1 else "✅ <b>DIRECT WIN (Step 1)</b>"
+                            else:
+                                outcome_icon = f"❌ <b>LOSS (Failed at Step {played_step})</b>"
+                                
+                            outcome_msg = (
+                                f"📊 <b>Round:</b> <code>{current_period}</code>\n"
+                                f"🎯 <b>Result:</b> {'🔴 BIG' if result=='BIG' else '🔵 SMALL'} [{num}]\n"
+                                f"⚖️ <b>Status:</b> {outcome_icon}\n"
+                                f"━━━━━━━━━━━━━━━━━━\n"
+                            )
 
-                        # Trigger adaptive retrain on streak loss
-                        _, _, _, _, curr_loss_streak, _, _, _, _ = self.db.get_detailed_stats()
+                        # Determine Next Target Period
+                        next_per = str(int(current_period) + 1) if '_' not in current_period else f"{current_period.split('_')[0]}_{int(current_period.split('_')[1])+1:04d}"
+                        
+                        # Calculate Next Step Level
+                        tot, w, l, ws, curr_loss_streak, max_loss, max_win, avg_step, _ = self.db.get_detailed_stats()
+                        next_step = curr_loss_streak + 1
+                        
+                        # Generate Prediction
+                        pred, conf, strategy = self.get_final_prediction()
+                        self.db.save_prediction(next_per, pred, step=next_step)
+                        
+                        rate = (w/tot*100) if tot > 0 else 0
+                        emoji = "🔴 BIG" if pred == 'BIG' else "🔵 SMALL"
+                        prog_bar = self.get_progress_bar(conf)
+                        
+                        # Step Status Indicator
+                        if next_step == 1:
+                            step_display = "🟢 Step 1 (Normal Trade)"
+                        elif next_step == 2:
+                            step_display = "🟡 Step 2 (1st Recovery)"
+                        elif next_step == 3:
+                            step_display = "🟠 Step 3 (2nd Recovery)"
+                        else:
+                            step_display = f"🔴 Step {next_step} (High Recovery Mode)"
+
+                        msg = (
+                            f"⚡ <b>VIP AI SIGNAL</b> ⚡\n"
+                            f"━━━━━━━━━━━━━━━━━━\n"
+                            f"{outcome_msg}"
+                            f"🔮 <b>Target Period:</b> <code>{next_per}</code>\n"
+                            f"🧠 <b>Prediction:</b> <b>{emoji}</b>\n"
+                            f"🪜 <b>Current Level:</b> <b>{step_display}</b>\n"
+                            f"🚥 [{prog_bar}] {conf}%\n"
+                            f"⚙️ <b>Strategy:</b> {strategy}\n"
+                            f"━━━━━━━━━━━━━━━━━━\n"
+                            f"🏆 <b>Win Rate:</b> {rate:.1f}%\n"
+                            f"💀 <b>Max Loss Step:</b> {max_l if 'max_l' in locals() else max_loss} | ⚡ <b>Avg Win:</b> Step {avg_step:.1f}\n"
+                        )
+                        self.bot.send_message(msg, self.bot.get_inline_keyboard())
+                        print(f"[{next_per}] Signal: {pred} | Step: {next_step} | Conf: {conf}%")
+
+                        # Loss Adaptation: If 2+ consecutive losses, instantly trigger background re-training
                         if curr_loss_streak >= 2:
+                            print("⚠️ Loss streak detected. Triggering adaptive AI retraining...")
                             threading.Thread(target=self.ai.train_models, args=(self.db.get_recent_history(250),)).start()
+                        elif int(str(current_period)[-2:]) % 15 == 0:
+                            threading.Thread(target=self.ai.train_models, args=(self.db.get_recent_history(200),)).start()
 
                         self.last_period = current_period
                         
             except Exception as e:
-                print(f"Error in main loop: {e}")
+                pass
             
             time.sleep(2)
 
@@ -489,14 +474,9 @@ class DummyHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"VIP AI is Active.")
 
-    def do_HEAD(self):
-        self.send_response(200)
-        self.end_headers()
-
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
     threading.Thread(
-        target=lambda: HTTPServer(('0.0.0.0', port), DummyHandler).serve_forever(),
+        target=lambda: HTTPServer(('0.0.0.0', int(os.environ.get("PORT", 8080))), DummyHandler).serve_forever(),
         daemon=True
     ).start()
     UltimateController().loop()
