@@ -1,0 +1,11 @@
+flask
+flask-socketio
+flask-cors
+requests
+numpy
+pandas
+pandas-ta
+scikit-learn
+tensorflow
+xgboost
+joblib
