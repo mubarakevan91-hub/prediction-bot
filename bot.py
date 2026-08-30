@@ -474,9 +474,6 @@ class DummyHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"VIP AI is Active.")
 
-if __name__ == "__main__":
-    threading.Thread(
-        target=lambda: HTTPServer(('0.0.0.0', int(os.environ.get("PORT", 8080))), DummyHandler).serve_forever(),
-        daemon=True
-    ).start()
-    UltimateController().loop()
+    def do_HEAD(self):
+        self.send_response(200)
+        self.end_headers()
