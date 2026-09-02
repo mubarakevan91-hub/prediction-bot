@@ -10,9 +10,6 @@ import threading
 import requests
 import numpy as np
 import pandas as pd
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import io
 import math
 from datetime import datetime
@@ -30,7 +27,7 @@ from tensorflow.keras.optimizers import Adam
 # CONFIGURATION
 # ==============================================================================
 
-TELEGRAM_TOKEN = "8946950031:AAEjErIWu-7H6jnXvUJw30eJ9olA_iuXrzo"
+TELEGRAM_TOKEN = "8217723591:AAGXgEwsK64U8QYl0vLNQsa5a_SvPvLbxSo"
 TELEGRAM_CHAT_ID = "8395823375"
 API_URL = "https://draw.ar-lottery01.com/WinGo/WinGo_30S/GetHistoryIssuePage.json"
 DB_FILE = "quant_ai_memory.db"
@@ -465,27 +462,18 @@ class UltimateController:
             time.sleep(2)
 
 # ==============================================================================
-# RENDER KEEPALIVE SERVER (FIXED FOR HEAD REQUESTS)
+# RENDER KEEPALIVE SERVER
 # ==============================================================================
 
 class DummyHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
-        self.send_header("Content-type", "text/plain")
         self.end_headers()
         self.wfile.write(b"VIP AI is Active.")
 
-    def do_HEAD(self):
-        # Render-এর লুপ চেক সফল করার জন্য এই অংশটি অত্যন্ত জরুরি
-        self.send_response(200)
-        self.send_header("Content-type", "text/plain")
-        self.end_headers()
-
 if __name__ == "__main__":
-    # Render-এর ডিফল্ট পোর্ট ১০০০০, তাই পরিবেশ ভেরিয়েবল চেক করা হচ্ছে
-    port = int(os.environ.get("PORT", 10000))
     threading.Thread(
-        target=lambda: HTTPServer(('0.0.0.0', port), DummyHandler).serve_forever(),
+        target=lambda: HTTPServer(('0.0.0.0', int(os.environ.get("PORT", 8080))), DummyHandler).serve_forever(),
         daemon=True
     ).start()
     UltimateController().loop()
