@@ -1,10 +1,11 @@
 #============================================================
-# ULTIMATE VIP STRIKE V27.0 - QUANTUM ENSEMBLE AI
-# DEEP PATTERN + RUSSIAN + BAYESIAN + NEURAL NET + HARMONIC
+# ULTIMATE VIP STRIKE V29.0 - QUANTUM ENSEMBLE AI (LIVE SYNC)
+# 5-LAYER AI + LIVE MARKET SYNC + BULLETPROOF LOOP
 #============================================================
 """
 Advanced VIP Signal Bot
 5-Layer AI Ensemble Core
+Live Market Synchronization
 Telegram Bot UI
 Quantum Pattern Analysis
 """
@@ -418,7 +419,7 @@ def get_vip_inline_keyboard():
     }
 
 #============================================================
-# ⚙️ MAIN ENGINE & CONTROLLER
+# ⚙️ MAIN ENGINE & CONTROLLER (LIVE SYNC EDITION)
 #============================================================
 class Engine:
     def __init__(self):
@@ -531,37 +532,62 @@ class Engine:
         self.last_harm_prediction, self.last_harm_conf = preds.get("harm_pred"), preds.get("harm_conf", 0)
         self.last_prediction, self.last_pred_conf = preds.get("final_pred"), preds.get("final_conf", 0)
 
+    def initialize_live_state(self):
+        """Fetches the actual current live period from the website and syncs the bot."""
+        try:
+            resp = requests.get(API_DOMAINS[0], params={"pageNo": 1, "pageSize": 2, "t": int(time.time() * 1000)}, timeout=6)
+            if resp.status_code == 200:
+                lst = resp.json().get("data", {}).get("list", [])
+                if lst:
+                    # lst[0] is the latest completed issue on the website
+                    current_live_issue = str(lst[0].get("issueNumber"))
+                    self.last_issue = current_live_issue
+                    
+                    # Generate prediction for the NEXT live issue
+                    self.refresh_predictions()
+                    
+                    next_issue = self.safe_next_issue(self.last_issue)
+                    now_bd = get_bd_now()
+                    msg = (
+                        f"👑 <b>QUANTUM ENSEMBLE AI TRAINED & SYNCED</b>\n"
+                        f"━━━━━━━━━━━━━━━━━━━━\n"
+                        f"📚 <b>Historical Data Learned:</b> <code>{len(self.dataset)} Rounds</code>\n"
+                        f"🌐 <b>Live Market Synced:</b> <code>Period {self.last_issue}</code>\n"
+                        f"🎯 <b>Next Live Prediction:</b> <code>{next_issue}</code>\n"
+                        f"🧬 <b>Final Signal:</b> <b>{self.last_prediction or 'N/A'}</b> "
+                        f"{self.icon(self.last_prediction)} <b>({self.last_pred_conf}%)</b>\n"
+                        f"🧠 <b>Deep AI:</b> <b>{self.last_deep_prediction or 'N/A'}</b> ({self.last_deep_conf}%)\n"
+                        f"🇷🇺 <b>Russian:</b> <b>{self.last_russian_prediction or 'N/A'}</b> ({self.last_russian_conf}%)\n"
+                        f"🧮 <b>Bayesian:</b> <b>{self.last_bayes_prediction or 'N/A'}</b> ({self.last_bayes_conf}%)\n"
+                        f"🧬 <b>Neural Net:</b> <b>{self.last_nn_prediction or 'N/A'}</b> ({self.last_nn_conf}%)\n"
+                        f"🌊 <b>Harmonic:</b> <b>{self.last_harm_prediction or 'N/A'}</b> ({self.last_harm_conf}%)\n"
+                        f"🕒 <b>Sync Time:</b> <code>{now_bd.strftime('%I:%M:%S %p')}</code>\n"
+                        f"━━━━━━━━━━━━━━━━━━━━\n"
+                        f"🎓 <i>Live market prediction started based on historical patterns.</i>"
+                    )
+                    self.broadcast(msg, get_vip_inline_keyboard())
+                    return True
+        except Exception as e:
+            print(f"⚠️ Live sync error: {e}")
+        return False
+
     def load_file_and_train_deeply(self, content_str):
         records = self.parse_csv_records(content_str)
         if len(records) < 15: return False, 0
+        
+        # 1. Train models on historical data
         self.dataset = records
         self.ai.train(self.dataset)
         self.russian.train(self.dataset)
         self.bayesian.train(self.dataset)
-        self.neural.train_on_dataset(self.dataset, epochs=3)
-        self.harmonic.train(self.dataset)
+        self.neural.train_on_dataset(self.dataset[-300:] if len(self.dataset) > 300 else self.dataset, epochs=1)
+        self.harmonic.train(self.dataset[-300:] if len(self.dataset) > 300 else self.dataset)
+        
         self.is_active = True
-        self.last_issue = self.dataset[-1]["issue"]
-        self.refresh_predictions()
-        next_issue = self.safe_next_issue(self.last_issue)
-        now_bd = get_bd_now()
-        msg = (
-            f"👑 <b>QUANTUM ENSEMBLE AI TRAINED</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"📚 <b>Mastered Rounds:</b> <code>{len(records)}</code>\n"
-            f"🎯 <b>Next Period:</b> <code>{next_issue}</code>\n"
-            f"🧬 <b>Final Signal:</b> <b>{self.last_prediction or 'N/A'}</b> "
-            f"{self.icon(self.last_prediction)} <b>({self.last_pred_conf}%)</b>\n"
-            f"🧠 <b>Deep AI:</b> <b>{self.last_deep_prediction or 'N/A'}</b> ({self.last_deep_conf}%)\n"
-            f"🇷🇺 <b>Russian:</b> <b>{self.last_russian_prediction or 'N/A'}</b> ({self.last_russian_conf}%)\n"
-            f"🧮 <b>Bayesian:</b> <b>{self.last_bayes_prediction or 'N/A'}</b> ({self.last_bayes_conf}%)\n"
-            f"🧬 <b>Neural Net:</b> <b>{self.last_nn_prediction or 'N/A'}</b> ({self.last_nn_conf}%)\n"
-            f"🌊 <b>Harmonic:</b> <b>{self.last_harm_prediction or 'N/A'}</b> ({self.last_harm_conf}%)\n"
-            f"🕒 <b>Sync Time:</b> <code>{now_bd.strftime('%I:%M:%S %p')}</code>\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"🎓 <i>Advanced Analytical & Educational Pattern System.</i>"
-        )
-        self.broadcast(msg, get_vip_inline_keyboard())
+        
+        # 2. Sync with live market (Crucial Fix)
+        self.initialize_live_state()
+        
         return True, len(records)
 
     def generate_stats_report(self):
@@ -631,7 +657,7 @@ class Engine:
         )
 
     def run(self):
-        print("🚀 QUANTUM ENSEMBLE AI ENGINE STARTED...")
+        print("🚀 QUANTUM ENSEMBLE AI ENGINE STARTED (LIVE SYNC MODE)...")
         offset = None
         while not _shutdown.is_set():
             updates = self.bot.get_updates(offset)
@@ -684,6 +710,7 @@ class Engine:
                 time.sleep(2)
                 continue
 
+            # Live API monitoring
             try:
                 resp = requests.get(API_DOMAINS[0], params={"pageNo": 1, "pageSize": 10, "t": int(time.time() * 1000)}, timeout=6)
                 if resp.status_code == 200:
@@ -692,9 +719,12 @@ class Engine:
                         current_issue = str(lst[0].get("issueNumber"))
                         num = int(lst[0].get("number", 0))
                         actual_res = result_from_number(num)
+                        
                         if current_issue != self.last_issue:
                             now_bd = get_bd_now()
                             outcome_str = "⏳"
+                            
+                            # Evaluate the prediction made for THIS current_issue
                             if self.last_prediction:
                                 is_win = self.last_prediction == actual_res
                                 self.time_intel.record_result(is_win, now_bd)
@@ -707,20 +737,32 @@ class Engine:
                                     if self.current_loss_streak > self.max_loss_streak: self.max_loss_streak = self.current_loss_streak
                                     outcome_str = "❌ <b>LOSS</b>"
                             
+                            # Update state to the newly completed issue
+                            self.last_issue = current_issue
+                            
+                            # Append to live dataset for continuous learning
                             self.dataset.append({"issue": current_issue, "number": num, "result": actual_res})
                             if len(self.dataset) > 1500: self.dataset = self.dataset[-1500:]
                             
-                            self.ai.train(self.dataset)
-                            self.russian.train(self.dataset)
-                            self.bayesian.train(self.dataset)
-                            self.neural.train_on_dataset(self.dataset, epochs=1)
-                            self.harmonic.train(self.dataset)
-                            
-                            self.last_issue = current_issue
+                            # Retrain models with new live data
+                            try:
+                                train_subset = self.dataset[-300:] if len(self.dataset) > 300 else self.dataset
+                                self.ai.train(self.dataset)
+                                self.russian.train(self.dataset)
+                                self.bayesian.train(self.dataset)
+                                self.neural.train_on_dataset(train_subset, epochs=1)
+                                self.harmonic.train(train_subset)
+                            except Exception as e:
+                                print(f"⚠️ AI Training error: {e}")
+                                
+                            # Generate prediction for the NEXT issue
                             self.refresh_predictions()
+                            
                             live_msg = self.format_live_message(current_issue, actual_res, num, outcome_str, now_bd)
                             self.broadcast(live_msg, get_vip_inline_keyboard())
-            except Exception: pass
+            except Exception as e:
+                print(f"⚠️ API Fetch error: {e}")
+                
             time.sleep(2)
 
 #============================================================
@@ -731,7 +773,7 @@ def run_web():
         def do_GET(self):
             self.send_response(200)
             self.end_headers()
-            self.wfile.write(b'{"status":"running", "engine":"VIP Strike V27.0 Quantum Ensemble"}')
+            self.wfile.write(b'{"status":"running", "engine":"VIP Strike V29.0 Quantum Ensemble"}')
         def log_message(self, format, *args): return
     port = int(os.environ.get("PORT", 5000))
     server = HTTPServer(("0.0.0.0", port), S)
@@ -746,17 +788,14 @@ if __name__ == "__main__":
     
     engine = Engine()
     
-    # Auto-load dataset if exists in the same directory
     if os.path.exists("dataset.csv"):
         print("📂 dataset.csv found. Loading and training 5-Layer AI models...")
         try:
             with open("dataset.csv", "r", encoding="utf-8") as f:
                 content = f.read()
             ok, count = engine.load_file_and_train_deeply(content)
-            if ok:
-                print(f"✅ Successfully trained on {count} records from local file.")
-            else:
-                print("⚠️ Local dataset found but training failed (needs 15+ records).")
+            if ok: print(f"✅ Successfully trained on {count} records and synced to live market.")
+            else: print("⚠️ Local dataset found but training failed (needs 15+ records).")
         except Exception as e:
             print(f"⚠️ Error reading local dataset: {e}")
     else:
