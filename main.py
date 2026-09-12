@@ -2,7 +2,10 @@
 # -*- coding: utf-8 -*-
 """
 ================================================================================
-👑 VIP STRIKE V35.0 - ULTRA 4485+ PREDICTION ENGINE (RENDER ALL-IN-ONE)
+👑 VIP STRIKE V35.5 ULTRA - DUAL-THREADED REAL-TIME ENGINE (RENDER 100% WORKING)
+THREAD 1: INSTANT TELEGRAM BOT RESPONDER (NO LAG / NO FREEZE)
+THREAD 2: AUTONOMOUS 30S LIVE SCRAPER & CONTINUOUS SIGNAL BROADCASTER
+THREAD 3: EMBEDDED WEB HEALTH SERVER FOR RENDER 24/7 KEEP-ALIVE
 ================================================================================
 """
 
@@ -47,7 +50,7 @@ except ImportError:
 # ==============================================================================
 @dataclass
 class SystemConfig:
-    version: str = "35.0-ULTRA-4485"
+    version: str = "35.5-ULTRA-DUAL-THREAD"
     telegram_token: str = os.environ.get("TELEGRAM_TOKEN", "8858558197:AAHvvS-rh9j1U9grv3SzmyqPsxN1FHNlv6E")
     default_chat_id: str = os.environ.get("DEFAULT_CHAT_ID", "8395823375")
     db_path: str = os.environ.get("DB_PATH", "vip_strike_data.db")
@@ -56,13 +59,13 @@ class SystemConfig:
     http_host: str = os.environ.get("HOST", "0.0.0.0")
 
     api_domains: List[str] = field(default_factory=lambda: [
-        "https://draw.ar-lottery01.com/WinGo/WinGo_30S/GetHistoryIssuePage.json",
         "https://draw.ar-lottery02.com/WinGo/WinGo_30S/GetHistoryIssuePage.json",
-        "https://draw.ar-lottery03.com/WinGo/WinGo_30S/GetHistoryIssuePage.json"
+        "https://draw.ar-lottery03.com/WinGo/WinGo_30S/GetHistoryIssuePage.json",
+        "https://draw.ar-lottery01.com/WinGo/WinGo_30S/GetHistoryIssuePage.json"
     ])
 
     poll_interval_sec: float = 2.0
-    request_timeout_sec: float = 8.0
+    request_timeout_sec: float = 6.0
     max_history_memory: int = 25000
     min_train_samples: int = 15
     feature_window_size: int = 12
@@ -74,6 +77,15 @@ class SystemConfig:
 CONFIG = SystemConfig()
 BD_TZ = timezone(timedelta(hours=CONFIG.tz_offset_hours))
 _SHUTDOWN_EVENT = threading.Event()
+
+# Browser headers to prevent 403 blocks from lottery API
+HTTP_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Origin": "https://ar-lottery02.com",
+    "Referer": "https://ar-lottery02.com/"
+}
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("VIPStrike35")
@@ -154,16 +166,6 @@ class DatabaseManager:
                 )
             """)
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS predictions (
-                    issue TEXT PRIMARY KEY,
-                    predicted_outcome TEXT NOT NULL,
-                    confidence INTEGER NOT NULL,
-                    actual_outcome TEXT,
-                    is_correct INTEGER,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS allowed_chats (
                     chat_id TEXT PRIMARY KEY,
                     username TEXT,
@@ -239,7 +241,7 @@ class HistoricalSequenceResonanceEngine:
     def predict(self, dataset: List[Dict[str, Any]]) -> Tuple[Optional[str], int]:
         n = len(dataset)
         flen = self.fingerprint_len
-        if n < flen + 20:
+        if n < flen + 10:
             return None, 0
 
         seq_res = [1 if str(d.get("result", "")).upper() == "BIG" else 0 for d in dataset]
@@ -386,7 +388,7 @@ class DeepNeuralEngineV35:
         try:
             self.scaler = StandardScaler()
             Xs = self.scaler.fit_transform(np.array(X))
-            self.model = MLPClassifier(hidden_layer_sizes=(256, 128, 64, 32), max_iter=250, random_state=42, early_stopping=True)
+            self.model = MLPClassifier(hidden_layer_sizes=(128, 64, 32), max_iter=200, random_state=42, early_stopping=True)
             self.model.fit(Xs, np.array(y))
             self.is_trained = True
             return True
@@ -427,9 +429,9 @@ class MachineLearningMegaEnsemble:
         try:
             self.scaler = StandardScaler()
             Xs = self.scaler.fit_transform(np.array(X))
-            self.rf = RandomForestClassifier(n_estimators=100, max_depth=7, random_state=42)
+            self.rf = RandomForestClassifier(n_estimators=80, max_depth=6, random_state=42)
             self.rf.fit(Xs, np.array(y))
-            self.gb = GradientBoostingClassifier(n_estimators=80, max_depth=4, random_state=42)
+            self.gb = GradientBoostingClassifier(n_estimators=60, max_depth=4, random_state=42)
             self.gb.fit(Xs, np.array(y))
             self.is_trained = True
             return True
@@ -459,7 +461,6 @@ class MachineLearningMegaEnsemble:
 class RussianPredictionEngineV35:
     def __init__(self):
         self.markov3 = defaultdict(lambda: [0, 0])
-        self.streak_profile = defaultdict(lambda: [0, 0])
         self.trained = False
 
     def train(self, dataset):
@@ -467,7 +468,6 @@ class RussianPredictionEngineV35:
         if len(seq) < 10:
             return False
         self.markov3.clear()
-        self.streak_profile.clear()
         for i in range(len(seq) - 3):
             self.markov3[(seq[i], seq[i + 1], seq[i + 2])][seq[i + 3]] += 1
         self.trained = True
@@ -486,7 +486,7 @@ class RussianPredictionEngineV35:
         return ("BIG" if seq[-1] == 1 else "SMALL"), 63
 
 # ==============================================================================
-# TELEGRAM BOT & KEYBOARDS
+# TELEGRAM BOT CLIENT
 # ==============================================================================
 class TelegramBotClient:
     def __init__(self, token=CONFIG.telegram_token):
@@ -497,32 +497,32 @@ class TelegramBotClient:
         if reply_markup:
             payload["reply_markup"] = reply_markup
         try:
-            requests.post(self.url + "sendMessage", json=payload, timeout=CONFIG.request_timeout_sec)
-        except Exception:
-            pass
+            requests.post(self.url + "sendMessage", json=payload, timeout=5.0)
+        except Exception as e:
+            logger.debug(f"Telegram Send Exception: {e}")
 
     def answer_callback(self, cb_id, text=""):
         try:
-            requests.post(self.url + "answerCallbackQuery", data={"callback_query_id": cb_id, "text": text}, timeout=4.0)
+            requests.post(self.url + "answerCallbackQuery", data={"callback_query_id": cb_id, "text": text}, timeout=3.0)
         except Exception:
             pass
 
     def get_file_bytes(self, file_id):
         try:
-            res = requests.get(self.url + "getFile", params={"file_id": file_id}, timeout=10.0).json()
+            res = requests.get(self.url + "getFile", params={"file_id": file_id}, timeout=8.0).json()
             path = res.get("result", {}).get("file_path")
             if path:
-                return requests.get(f"https://api.telegram.org/file/bot{CONFIG.telegram_token}/{path}", timeout=40.0).content
+                return requests.get(f"https://api.telegram.org/file/bot{CONFIG.telegram_token}/{path}", timeout=30.0).content
         except Exception:
             pass
         return None
 
     def get_updates(self, offset=None):
         try:
-            p = {"timeout": 2}
+            p = {"timeout": 1}
             if offset:
                 p["offset"] = offset
-            res = requests.get(self.url + "getUpdates", params=p, timeout=CONFIG.request_timeout_sec)
+            res = requests.get(self.url + "getUpdates", params=p, timeout=4.0)
             return res.json().get("result", []) if res.status_code == 200 else []
         except Exception:
             return []
@@ -536,7 +536,7 @@ def get_vip_keyboard():
     }
 
 # ==============================================================================
-# MASTER ENGINE ORCHESTRATOR
+# MASTER ENGINE CORE
 # ==============================================================================
 class MasterEngine:
     def __init__(self):
@@ -577,6 +577,7 @@ class MasterEngine:
             self.train_all()
             self.last_issue = self.dataset[-1]["issue"]
             self.is_active = True
+            logger.info(f"🔄 Database loaded: {len(saved)} rounds active.")
 
     def train_all(self):
         self.neural_engine.train(self.dataset, self.extractor)
@@ -612,7 +613,9 @@ class MasterEngine:
             self.last_prediction, self.last_pred_conf = None, 0
 
     def broadcast(self, msg, kb=None):
-        for cid in self.db.get_all_chats():
+        chats = self.db.get_all_chats()
+        logger.info(f"📢 Broadcasting to {len(chats)} chats...")
+        for cid in chats:
             self.bot.send_message(cid, msg, reply_markup=kb)
 
     def safe_next_issue(self, issue):
@@ -632,8 +635,8 @@ class MasterEngine:
                 num = int(row[1].strip()) if len(row) > 1 and str(row[1]).strip().isdigit() else 0
                 res = str(row[2]).strip().upper() if len(row) > 2 and str(row[2]).strip().upper() in {"BIG", "SMALL"} else result_from_number(num)
                 records.append({"issue": issue, "number": num, "result": res, "parity": parity_from_number(num), "color": color_from_number(num), "timestamp": format_bd_time()})
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Ingest Error: {e}")
 
         if len(records) < CONFIG.min_train_samples:
             return False, len(records)
@@ -658,70 +661,138 @@ class MasterEngine:
             f"🔍 <b>4485 Resonance:</b> {self.last_res_pred} ({self.last_res_conf}%)\n"
             f"🎲 <b>Markov O8:</b> {self.last_mk_pred} ({self.last_mk_conf}%)\n"
             f"🇷🇺 <b>Russian Core:</b> {self.last_ru_pred} ({self.last_ru_conf}%)\n"
-            f"🕒 <b>Sync Time:</b> <code>{format_bd_time()}</code>"
+            f"🕒 <b>Sync Time:</b> <code>{format_bd_time()}</code>\n"
+            f"💎 <i>স্বয়ংক্রিয় লাইভ সিগন্যাল মনিটরিং সক্রিয় রয়েছে।</i>"
         )
         self.broadcast(msg, get_vip_keyboard())
         return True, len(records)
 
-    def run(self):
-        logger.info("🚀 ULTRA ENTERPRISE PREDICTION SUITE RUNNING...")
+    # --------------------------------------------------------------------------
+    # THREAD 1: TELEGRAM BOT EVENT LOOP (INSTANT RESPONSE)
+    # --------------------------------------------------------------------------
+    def run_telegram_loop(self):
+        logger.info("🤖 Telegram Bot Poller Thread Started...")
         offset = None
 
         while not _SHUTDOWN_EVENT.is_set():
-            updates = self.bot.get_updates(offset)
-            for u in updates:
-                offset = u["update_id"] + 1
-                if "callback_query" in u:
-                    cb = u["callback_query"]
-                    data = cb.get("data", "")
-                    chat_id = str(cb.get("message", {}).get("chat", {}).get("id", ""))
-                    self.bot.answer_callback(cb.get("id"), "✅")
+            try:
+                updates = self.bot.get_updates(offset)
+                for u in updates:
+                    offset = u["update_id"] + 1
+
+                    if "callback_query" in u:
+                        cb = u["callback_query"]
+                        data = cb.get("data", "")
+                        chat_id = str(cb.get("message", {}).get("chat", {}).get("id", ""))
+                        self.bot.answer_callback(cb.get("id"), "✅")
+
+                        if chat_id:
+                            kb = get_vip_keyboard()
+                            if data == "btn_live_stats":
+                                total = self.total_wins + self.total_losses
+                                wr = (self.total_wins / total * 100.0) if total > 0 else 0.0
+                                msg = (
+                                    f"📊 <b>লাইভ পারফরম্যান্স ড্যাশবোর্ড</b>\n"
+                                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                                    f"🔥 <b>Win Streak:</b> <code>{self.current_win_streak}</code>\n"
+                                    f"⚠️ <b>Loss Streak:</b> <code>{self.current_loss_streak}</code>\n"
+                                    f"🏆 <b>Max Win Streak:</b> <code>{self.max_win_streak}</code>\n"
+                                    f"✅ <b>Wins:</b> <code>{self.total_wins}</code> | ❌ <b>Losses:</b> <code>{self.total_losses}</code>\n"
+                                    f"📈 <b>Win Rate:</b> <code>{wr:.1f}%</code>"
+                                )
+                                self.bot.send_message(chat_id, msg, reply_markup=kb)
+                            elif data in ("btn_curr_signal", "btn_ensemble"):
+                                next_i = self.safe_next_issue(self.last_issue)
+                                msg = (
+                                    f"🎯 <b>Period:</b> <code>{next_i}</code>\n"
+                                    f"🧬 <b>Signal:</b> <b>{self.last_prediction or 'N/A'}</b> {signal_badge(self.last_prediction)} <b>({self.last_pred_conf}%)</b>\n\n"
+                                    f"🧠 <b>Neural:</b> {self.last_dl_pred} ({self.last_dl_conf}%)\n"
+                                    f"🌲 <b>ML:</b> {self.last_ml_pred} ({self.last_ml_conf}%)\n"
+                                    f"🔍 <b>Resonance:</b> {self.last_res_pred} ({self.last_res_conf}%)\n"
+                                    f"🇷🇺 <b>Russian:</b> {self.last_ru_pred} ({self.last_ru_conf}%)"
+                                )
+                                self.bot.send_message(chat_id, msg, reply_markup=kb)
+                            elif data == "btn_resonance":
+                                self.bot.send_message(chat_id, f"🔍 <b>4485 Resonance:</b> {self.last_res_pred} ({self.last_res_conf}%)\nDataset: <code>{len(self.dataset)} rounds</code>", reply_markup=kb)
+                        continue
+
+                    msg = u.get("message", {})
+                    chat_id = str(msg.get("chat", {}).get("id", ""))
+                    doc = msg.get("document")
+                    text = msg.get("text", "")
+
                     if chat_id:
-                        kb = get_vip_keyboard()
-                        if data == "btn_live_stats":
-                            total = self.total_wins + self.total_losses
-                            wr = (self.total_wins / total * 100.0) if total > 0 else 0.0
-                            self.bot.send_message(chat_id, f"📊 <b>Live Stats:</b> Wins: <code>{self.total_wins}</code> | Losses: <code>{self.total_losses}</code> | WinRate: <code>{wr:.1f}%</code> | Streak: <code>{self.current_win_streak}</code>", reply_markup=kb)
-                        elif data in ("btn_curr_signal", "btn_ensemble"):
-                            next_i = self.safe_next_issue(self.last_issue)
-                            self.bot.send_message(chat_id, f"🎯 <b>Period:</b> <code>{next_i}</code>\n🧬 <b>Signal:</b> <b>{self.last_prediction}</b> {signal_badge(self.last_prediction)} ({self.last_pred_conf}%)", reply_markup=kb)
-                        elif data == "btn_resonance":
-                            self.bot.send_message(chat_id, f"🔍 <b>4485 Resonance:</b> {self.last_res_pred} ({self.last_res_conf}%) on {len(self.dataset)} records.", reply_markup=kb)
-                    continue
+                        self.db.add_chat(chat_id, msg.get("chat", {}).get("username", ""))
 
-                msg = u.get("message", {})
-                chat_id = str(msg.get("chat", {}).get("id", ""))
-                doc = msg.get("document")
-                text = msg.get("text", "")
+                        if doc:
+                            self.bot.send_message(chat_id, "⏳ <b>ফাইল ডাউনলোড ও ৪,৪৮৫+ ডিপ লার্নিং ট্রেনিং শুরু হচ্ছে...</b>")
+                            b = self.bot.get_file_bytes(doc.get("file_id"))
+                            if b:
+                                ok, cnt = self.ingest_manual_dataset(b.decode("utf-8", errors="ignore"))
+                                if not ok:
+                                    self.bot.send_message(chat_id, "⚠️ মডেলে ট্রেইনিংয়ের জন্য কমপক্ষে ১৫+ রাউন্ড ডেটা প্রয়োজন।")
+                            else:
+                                self.bot.send_message(chat_id, "⚠️ ফাইল ডাউনলোড করা যায়নি।")
+                        elif text.startswith("/start"):
+                            self.bot.send_message(
+                                chat_id,
+                                "👑 <b>VIP Strike V35.5 Ultra Engine Live!</b>\n"
+                                "━━━━━━━━━━━━━━━━━━━━\n"
+                                "🤖 Deep Neural Net + 🌲 Tree ML + 🔍 4485 Resonance + 🇷🇺 Russian Engine\n\n"
+                                "বট চালু করতে আপনার <code>dataset_export.csv</code> ফাইলটি পাঠান।\n"
+                                "অথবা সরাসরি লাইভ সিগন্যালের অপেক্ষা করুন।",
+                                reply_markup=get_vip_keyboard()
+                            )
+            except Exception as e:
+                logger.debug(f"Telegram Loop Exception: {e}")
 
-                if chat_id:
-                    self.db.add_chat(chat_id, msg.get("chat", {}).get("username", ""))
-                    if doc:
-                        self.bot.send_message(chat_id, "⏳ <b>ফাইল প্রসেসিং ও ৪,৪৮৫+ ডিপ লার্নিং ট্রেনিং চলছে...</b>")
-                        b = self.bot.get_file_bytes(doc.get("file_id"))
-                        if b:
-                            ok, cnt = self.ingest_manual_dataset(b.decode("utf-8", errors="ignore"))
-                            if not ok:
-                                self.bot.send_message(chat_id, "⚠️ মডেলে ট্রেইনিংয়ের জন্য কমপক্ষে ১৫+ রাউন্ড প্রয়োজন।")
-                        else:
-                            self.bot.send_message(chat_id, "⚠️ ফাইল ডাউনলোড করা যায়নি।")
-                    elif text.startswith("/start"):
-                        self.bot.send_message(chat_id, "👑 <b>VIP Strike V35.0 Ultra AI Engine Live!</b>\nআপনার <code>dataset_export.csv</code> ফাইলটি পাঠান।", reply_markup=get_vip_keyboard())
+            time.sleep(0.5)
 
-            # Real-Time Lottery API Polling
+    # --------------------------------------------------------------------------
+    # THREAD 2: AUTONOMOUS 30S LIVE API SCRAPER & SIGNAL BROADCASTER
+    # --------------------------------------------------------------------------
+    def run_scraper_loop(self):
+        logger.info("📡 Autonomous 30S Lottery Scraper Thread Started...")
+
+        while not _SHUTDOWN_EVENT.is_set():
             try:
                 for api_url in CONFIG.api_domains:
                     try:
-                        resp = requests.get(api_url, params={"pageNo": 1, "pageSize": 10, "t": int(time.time() * 1000)}, timeout=CONFIG.request_timeout_sec)
+                        resp = requests.get(
+                            api_url,
+                            params={"pageNo": 1, "pageSize": 10, "t": int(time.time() * 1000)},
+                            headers=HTTP_HEADERS,
+                            timeout=CONFIG.request_timeout_sec
+                        )
                         if resp.status_code == 200:
-                            lst = resp.json().get("data", {}).get("list", [])
+                            data_json = resp.json()
+                            lst = data_json.get("data", {}).get("list", [])
                             if lst:
                                 current_issue = str(lst[0].get("issueNumber"))
                                 num = int(lst[0].get("number", 0))
                                 actual_res = result_from_number(num)
 
+                                # Auto bootstrap if dataset is empty
+                                if not self.dataset and len(lst) >= 5:
+                                    for item in reversed(lst):
+                                        i_no = str(item.get("issueNumber"))
+                                        n_val = int(item.get("number", 0))
+                                        self.dataset.append({
+                                            "issue": i_no, "number": n_val, "result": result_from_number(n_val),
+                                            "parity": parity_from_number(n_val), "color": color_from_number(n_val),
+                                            "timestamp": format_bd_time()
+                                        })
+                                    self.train_all()
+                                    self.last_issue = current_issue
+                                    self.is_active = True
+                                    self.refresh_predictions()
+                                    logger.info(f"⚡ Auto-Bootstrapped {len(self.dataset)} rounds from live API!")
+
+                                # New Period Detected!
                                 if current_issue != self.last_issue:
+                                    logger.info(f"🎯 NEW ROUND DETECTED: {current_issue} -> Result: {actual_res} ({num})")
                                     outcome_str = "⏳"
+
                                     if self.last_prediction:
                                         is_win = (self.last_prediction == actual_res)
                                         if is_win:
@@ -736,10 +807,16 @@ class MasterEngine:
                                             self.current_win_streak = 0
                                             outcome_str = "❌ <b>LOSS</b>"
 
-                                    self.dataset.append({"issue": current_issue, "number": num, "result": actual_res, "parity": parity_from_number(num), "color": color_from_number(num), "timestamp": format_bd_time()})
+                                    # Append and train
+                                    self.dataset.append({
+                                        "issue": current_issue, "number": num, "result": actual_res,
+                                        "parity": parity_from_number(num), "color": color_from_number(num),
+                                        "timestamp": format_bd_time()
+                                    })
                                     if len(self.dataset) > CONFIG.max_history_memory:
                                         self.dataset = self.dataset[-CONFIG.max_history_memory:]
 
+                                    self.db.insert_round(current_issue, num, actual_res, parity_from_number(num), color_from_number(num), format_bd_time())
                                     self.train_all()
                                     self.last_issue = current_issue
                                     self.is_active = True
@@ -755,19 +832,21 @@ class MasterEngine:
                                         f"━━━━━━━━━━━━━━━━━━━━\n"
                                         f"🎲 <b>Last:</b> {current_issue} ➔ <b>{actual_res} ({num})</b> | {outcome_str}\n"
                                         f"🔥 <b>Streak:</b> Win <code>{self.current_win_streak}</code> | Loss <code>{self.current_loss_streak}</code>\n"
+                                        f"🏆 <b>Max Win Streak:</b> <code>{self.max_win_streak}</code>\n"
                                         f"🕒 <b>Time:</b> <code>{format_bd_time()}</code>"
                                     )
                                     self.broadcast(live_msg, get_vip_keyboard())
                                 break
-                    except Exception:
+                    except Exception as e:
+                        logger.debug(f"API Attempt error on {api_url}: {e}")
                         continue
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Scraper Error: {e}")
 
             time.sleep(CONFIG.poll_interval_sec)
 
 # ==============================================================================
-# WEB SERVER FOR RENDER
+# WEB SERVER (RENDER KEEP-ALIVE & HEALTH CHECK)
 # ==============================================================================
 def run_web(engine):
     class S(BaseHTTPRequestHandler):
@@ -775,16 +854,40 @@ def run_web(engine):
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
-            self.wfile.write(json.dumps({"status": "healthy", "engine": "VIP Strike Ultra V35.0", "records": len(engine.dataset), "signal": engine.last_prediction}).encode("utf-8"))
+            payload = {
+                "status": "healthy",
+                "engine": "VIP Strike V35.5 Ultra",
+                "records": len(engine.dataset),
+                "last_issue": engine.last_issue,
+                "active_signal": engine.last_prediction,
+                "confidence": engine.last_pred_conf
+            }
+            self.wfile.write(json.dumps(payload).encode("utf-8"))
         def log_message(self, format, *args):
             return
+
     server = HTTPServer((CONFIG.http_host, CONFIG.http_port), S)
     logger.info(f"🌐 Web Server listening on port {CONFIG.http_port}")
     server.serve_forever()
 
+# ==============================================================================
+# MAIN ENTRY POINT
+# ==============================================================================
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, lambda s, f: _SHUTDOWN_EVENT.set())
     signal.signal(signal.SIGTERM, lambda s, f: _SHUTDOWN_EVENT.set())
+
+    print("================================================================================")
+    print("👑 VIP STRIKE V35.5 ULTRA - DUAL-THREADED 30S LIVE ENGINE")
+    print("================================================================================")
+
     master = MasterEngine()
-    threading.Thread(target=run_web, args=(master,), daemon=True).start()
-    master.run()
+
+    # Thread 1: Web Health Server for Render
+    threading.Thread(target=run_web, args=(master,), daemon=True, name="WebServerThread").start()
+
+    # Thread 2: Telegram Instant Responder
+    threading.Thread(target=master.run_telegram_loop, daemon=True, name="TelegramThread").start()
+
+    # Thread 3: Autonomous 30S Lottery Scraper & Signal Broadcaster (Main Thread)
+    master.run_scraper_loop()
